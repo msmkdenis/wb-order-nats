@@ -12,7 +12,7 @@ import (
 
 // PostgresPool represents PostgreSQL connection pool.
 type PostgresPool struct {
-	db     *pgxpool.Pool
+	DB     *pgxpool.Pool
 	logger *zap.Logger
 }
 
@@ -31,7 +31,7 @@ func NewPostgresPool(ctx context.Context, connection string, logger *zap.Logger)
 	logger.Info("Successful ping", zap.String("database", dbPool.Config().ConnConfig.Database))
 
 	return &PostgresPool{
-		db:     dbPool,
+		DB:     dbPool,
 		logger: logger,
 	}, nil
 }

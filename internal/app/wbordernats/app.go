@@ -13,6 +13,7 @@ import (
 
 	"github.com/msmkdenis/wb-order-nats/internal/config"
 	"github.com/msmkdenis/wb-order-nats/internal/handlers"
+	"github.com/msmkdenis/wb-order-nats/internal/middleware"
 	"github.com/msmkdenis/wb-order-nats/internal/repository"
 	"github.com/msmkdenis/wb-order-nats/internal/service"
 	"github.com/msmkdenis/wb-order-nats/internal/storage/db"
@@ -30,7 +31,10 @@ func Run(quitSignal chan os.Signal) {
 	orderRepository := repository.NewOrderRepository(postgresPool, logger)
 	orderService := service.NewOrderUseCase(orderRepository, logger)
 
+	requestLogger := middleware.InitRequestLogger(logger)
 	e := echo.New()
+
+	e.Use(requestLogger.RequestLogger())
 
 	handlers.NewOrderHandler(e, orderService, logger)
 

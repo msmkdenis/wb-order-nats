@@ -1,4 +1,4 @@
-// Package db contains the database migrations and interactions.
+// Package DB contains the database migrations and interactions.
 package db
 
 import (
@@ -32,7 +32,7 @@ func NewMigrations(connection string, logger *zap.Logger) (*Migrations, error) {
 	if err != nil {
 		return nil, apperr.NewValueError("Unable to parse connection string", apperr.Caller(), err)
 	}
-	logger.Info("Successful db url parsing", zap.String("database", dbConfig.ConnConfig.Database))
+	logger.Info("Successful DB url parsing", zap.String("database", dbConfig.ConnConfig.Database))
 
 	dbURL := makeDBURL(dbConfig, parseSSLMode(connection))
 

@@ -1,0 +1,1 @@
+truncate table wb_demo.item, wb_demo.delivery, wb_demo.payment, wb_demo."order";
