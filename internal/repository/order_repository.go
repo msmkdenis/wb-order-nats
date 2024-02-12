@@ -3,13 +3,13 @@ package repository
 import (
 	"context"
 	_ "embed"
-	"github.com/jackc/pgx/v5"
-	"github.com/msmkdenis/wb-order-nats/pkg/apperr"
 
+	"github.com/jackc/pgx/v5"
 	"go.uber.org/zap"
 
 	"github.com/msmkdenis/wb-order-nats/internal/model"
 	"github.com/msmkdenis/wb-order-nats/internal/storage/db"
+	"github.com/msmkdenis/wb-order-nats/pkg/apperr"
 )
 
 //go:embed queries/insert_delivery.sql
@@ -26,6 +26,9 @@ var insertPayment string
 
 //go:embed queries/select_full_order_by_id.sql
 var selectFullOrder string
+
+//go:embed queries/select_all_full_orders.sql
+var selectAllFullOrders string
 
 type OrderRepository struct {
 	postgresPool *db.PostgresPool
@@ -93,7 +96,6 @@ func (r *OrderRepository) Insert(ctx context.Context, o model.Order) error {
 
 	err = tx.Commit(context.Background())
 	if err != nil {
-		tx.Rollback(context.Background())
 		return err
 	}
 
@@ -107,10 +109,26 @@ func (r *OrderRepository) SelectById(ctx context.Context, orderId string) (*mode
 		return nil, err
 	}
 
-	order, err := pgx.CollectOneRow(rows, pgx.RowToAddrOfStructByName[model.Order])
+	order, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[model.Order])
 	if err != nil {
 		r.logger.Info("error", zap.Error(err))
 		return nil, err
 	}
-	return order, nil
+	return &order, nil
+}
+
+func (r *OrderRepository) SelectAll(ctx context.Context) ([]model.Order, error) {
+	rows, err := r.postgresPool.DB.Query(ctx, selectAllFullOrders)
+	if err != nil {
+		r.logger.Info("error", zap.Error(err))
+		return nil, err
+	}
+
+	orders, err := pgx.CollectRows(rows, pgx.RowToStructByName[model.Order])
+	if err != nil {
+		r.logger.Info("error", zap.Error(err))
+		return nil, err
+	}
+
+	return orders, nil
 }

@@ -11,6 +11,7 @@ import (
 type OrderService interface {
 	Save(ctx context.Context, order model.Order) error
 	FindById(ctx context.Context, orderId string) (*model.Order, error)
+	FindAll(ctx context.Context) ([]model.Order, error)
 }
 
 type OrderHandler struct {
@@ -26,6 +27,7 @@ func NewOrderHandler(e *echo.Echo, service OrderService, logger *zap.Logger) *Or
 
 	e.POST("/api/v1/order", handler.SaveOrder)
 	e.GET("/api/v1/order/:orderId", handler.FindOrderById)
+	e.GET("/api/v1/order/", handler.FindAll)
 
 	return handler
 }
@@ -64,4 +66,14 @@ func (h *OrderHandler) FindOrderById(c echo.Context) error {
 	}
 
 	return c.JSON(200, order)
+}
+
+func (h *OrderHandler) FindAll(c echo.Context) error {
+	orders, err := h.orderService.FindAll(context.Background())
+	if err != nil {
+		h.logger.Error("error", zap.Error(err))
+		return c.JSON(http.StatusInternalServerError, map[string]string{"Error": err.Error()})
+	}
+
+	return c.JSON(200, orders)
 }

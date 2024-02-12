@@ -10,6 +10,7 @@ import (
 type OrderRepository interface {
 	Insert(ctx context.Context, order model.Order) error
 	SelectById(ctx context.Context, orderId string) (*model.Order, error)
+	SelectAll(ctx context.Context) ([]model.Order, error)
 }
 
 type OrderUseCase struct {
@@ -34,4 +35,8 @@ func (o *OrderUseCase) Save(ctx context.Context, order model.Order) error {
 
 func (o *OrderUseCase) FindById(ctx context.Context, orderId string) (*model.Order, error) {
 	return o.repository.SelectById(ctx, orderId)
+}
+
+func (o *OrderUseCase) FindAll(ctx context.Context) ([]model.Order, error) {
+	return o.repository.SelectAll(ctx)
 }
