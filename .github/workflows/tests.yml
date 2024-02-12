@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  wb-order-nats-tests:
+    runs-on: ubuntu-latest
+    container: golang:1.21
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run tests
+        run: go test -race -tags fast -coverprofile unit.txt -covermode atomic ./...
+      - name: Upload coverage report to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./unit.txt
+          flags: unit
+          name: unit
+          token: ${{ secrets.CODECOV_TOKEN }}
