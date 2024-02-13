@@ -84,7 +84,7 @@ func Run(quitSignal chan os.Signal) {
 	go func() {
 		errStart := e.Start(cfg.Address)
 		if errStart != nil && !errors.Is(errStart, http.ErrServerClosed) {
-			log.Fatal(err)
+			log.Fatal(errStart)
 		}
 	}()
 

@@ -2,22 +2,29 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"github.com/docker/go-connections/nat"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
-	"github.com/magiconair/properties/assert"
+	"github.com/msmkdenis/wb-order-nats/internal/app/fakeproducer"
 	"github.com/msmkdenis/wb-order-nats/internal/cache/memory"
 	"github.com/msmkdenis/wb-order-nats/internal/config"
 	"github.com/msmkdenis/wb-order-nats/internal/consumer"
 	"github.com/msmkdenis/wb-order-nats/internal/handlers"
+	"github.com/msmkdenis/wb-order-nats/internal/middleware"
+	"github.com/msmkdenis/wb-order-nats/internal/model"
 	"github.com/msmkdenis/wb-order-nats/internal/repository"
 	"github.com/msmkdenis/wb-order-nats/internal/service"
 	"github.com/msmkdenis/wb-order-nats/internal/storage/db"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/zap"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -34,6 +41,9 @@ type IntegrationTestSuite struct {
 	postgresContainer      testcontainers.Container
 	natsStreamingContainer testcontainers.Container
 	pool                   *db.PostgresPool
+	endpoint               string
+	natsPort               nat.Port
+	natsHost               string
 }
 
 func TestSuite(t *testing.T) {
@@ -64,24 +74,55 @@ func (s *IntegrationTestSuite) SetupTest() {
 		logger.Error("Unable to setup test database", zap.Error(err))
 	}
 
-	//natsUrl := fmt.Sprintf("nats://127.0.0.1:%s", s.natsStreamingContainer.GetPort("4222/tcp"))
-	//s.natsClient, err = consumer.NewNatsClient("test-cluster", "test-client", "http://127.0.0.1:4222/", s.orderService, logger)
-	//if err != nil {
-	//	logger.Error("failed to connect to nats-streaming", zap.Error(err))
-	//}
-	//
-	//s.urlService = service.NewURLService(s.urlRepository, logger)
-	//s.echo = echo.New()
-	//s.endpoint, err = s.container.Endpoint(context.Background(), "http")
-	//if err != nil {
-	//	logger.Error("Unable to get endpoint", zap.Error(err))
-	//}
-	//s.urlHandler = handlers.NewURLHandler(s.echo, s.urlService, s.endpoint, jwtManager, logger)
+	s.natsPort, err = s.natsStreamingContainer.MappedPort(context.Background(), "4222")
+	if err != nil {
+		logger.Error("Unable to get nats port", zap.Error(err))
+	}
+	s.natsHost, err = s.natsStreamingContainer.Host(context.Background())
+	if err != nil {
+		logger.Error("Unable to get nats port", zap.Error(err))
+	}
+
+	s.natsClient, err = consumer.NewNatsClient("test-cluster", "test-consumer",
+		fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), s.orderService, logger)
+	if err != nil {
+		logger.Error("failed to connect to nats-streaming", zap.Error(err))
+	}
+
+	if s.natsClient != nil {
+		fmt.Println("NATS-STREAMING START RUNNING")
+		err = s.natsClient.OrderProcessingRun()
+		if err != nil {
+			logger.Error("failed to run order processing", zap.Error(err))
+		}
+	}
+
+	cacheMiddleware := middleware.NewCacheMiddleware(s.cache, logger)
+
+	s.echo = echo.New()
+
+	s.orderHandler = handlers.NewOrderHandler(s.echo, s.orderService, cacheMiddleware, logger)
 }
 
 func (s *IntegrationTestSuite) TestAB() {
-	a := 2 + 2
-	assert.Equal(s.T(), 4, a)
+	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()))
+
+	//time.Sleep(time.Second * 4)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/", nil)
+	rec := httptest.NewRecorder()
+
+	c := s.echo.NewContext(req, rec)
+
+	err := s.orderHandler.FindAll(c)
+	assert.NoError(s.T(), err)
+	var orders []model.Order
+	_ = json.Unmarshal(rec.Body.Bytes(), &orders)
+	fmt.Println(len(orders))
+}
+
+func (s *IntegrationTestSuite) TearDownTest() {
+	s.postgresContainer.Terminate(context.Background())
+	s.natsStreamingContainer.Terminate(context.Background())
 }
 
 func setupTestNatsStreaming(logger *zap.Logger) (testcontainers.Container, error) {

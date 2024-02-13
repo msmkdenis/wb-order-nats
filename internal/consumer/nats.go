@@ -14,9 +14,10 @@ type OrderService interface {
 }
 
 type NatsClient struct {
-	client stan.Conn
-	os     OrderService
-	logger *zap.Logger
+	client     stan.Conn
+	os         OrderService
+	logger     *zap.Logger
+	ordersChan chan model.Order
 }
 
 func NewNatsClient(cluster string, clientID string, natsURL string, service OrderService, logger *zap.Logger) (*NatsClient, error) {
@@ -27,18 +28,23 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 	}
 
 	return &NatsClient{
-		client: client,
-		os:     service,
-		logger: logger,
+		client:     client,
+		os:         service,
+		logger:     logger,
+		ordersChan: make(chan model.Order),
 	}, nil
 }
 
 func (n *NatsClient) OrderProcessingRun() error {
-	_, err := n.client.Subscribe("orders", n.consumeOrder(), stan.DurableName("test-durable"), stan.MaxInflight(20))
+	ss, err := n.client.Subscribe("orders", n.consumeOrder(), stan.DurableName("test-durable"),
+		stan.DeliverAllAvailable(), stan.MaxInflight(20))
+	fmt.Println(ss.IsValid())
 	if err != nil {
 		n.logger.Info("error", zap.Error(err))
 		return err
 	}
+
+	go n.WorkerSaveRun()
 	return nil
 }
 
@@ -46,15 +52,24 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 	return func(msg *stan.Msg) {
 		var order model.Order
 		err := json.Unmarshal(msg.Data, &order)
+		fmt.Println("received not saved", order)
 		if err != nil {
 			n.logger.Info("error", zap.Error(err))
 		} else {
-			item, _ := json.MarshalIndent(order, "", "  ")
-			fmt.Println(string(item))
-			err = n.os.Save(context.Background(), order)
-			if err != nil {
-				n.logger.Info("error", zap.Error(err))
-			}
+			n.ordersChan <- order
 		}
+	}
+}
+
+func (n *NatsClient) WorkerSaveRun() {
+	for i := 0; i < 100; i++ {
+		go func() {
+			for order := range n.ordersChan {
+				err := n.os.Save(context.Background(), order)
+				if err != nil {
+					n.logger.Info("error", zap.Error(err))
+				}
+			}
+		}()
 	}
 }

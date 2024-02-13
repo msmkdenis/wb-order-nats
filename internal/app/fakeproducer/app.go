@@ -16,9 +16,9 @@ func Run(cluster string, clientID string, natsURL string) {
 
 	ackHandler := func(ackedNuid string, err error) {
 		if err != nil {
-			logger.Error("Error acking msg", zap.String("nuid", ackedNuid), zap.Error(err))
+			logger.Error("Warning: error publishing msg id ", zap.String("nuid", ackedNuid), zap.Error(err))
 		} else {
-			logger.Info("Msg acked", zap.String("nuid", ackedNuid))
+			logger.Info("Received ack for msg ", zap.String("nuid", ackedNuid))
 		}
 	}
 
@@ -28,10 +28,11 @@ func Run(cluster string, clientID string, natsURL string) {
 		return
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 100; i++ {
 		order := newFakeOrder()
 		or, _ := json.Marshal(order)
-		_, err = sc.PublishAsync("orders", or, ackHandler) // returns immediately
+		uuid, err := sc.PublishAsync("orders", or, ackHandler) // returns immediately
+		fmt.Println("Published:", uuid, "Error:", err)
 		if err != nil {
 			logger.Error("Error publishing", zap.Error(err))
 		}
