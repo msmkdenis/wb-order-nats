@@ -11,7 +11,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
+	"github.com/msmkdenis/wb-order-nats/internal/cache/memory"
 	"github.com/msmkdenis/wb-order-nats/internal/config"
+	"github.com/msmkdenis/wb-order-nats/internal/consumer"
 	"github.com/msmkdenis/wb-order-nats/internal/handlers"
 	"github.com/msmkdenis/wb-order-nats/internal/middleware"
 	"github.com/msmkdenis/wb-order-nats/internal/repository"
@@ -29,14 +31,34 @@ func Run(quitSignal chan os.Signal) {
 	postgresPool := initPostgresPool(&cfg, logger)
 
 	orderRepository := repository.NewOrderRepository(postgresPool, logger)
-	orderService := service.NewOrderUseCase(orderRepository, logger)
+	cache := memory.NewCache(logger)
+
+	orderService := service.NewOrderUseCase(orderRepository, cache, logger)
+	err = orderService.RestoreCache()
+	if err != nil {
+		logger.Error("failed to restore cache", zap.Error(err))
+	}
+
+	nats, err := consumer.NewNatsClient("test-cluster", "test-client", "http://127.0.0.1:4222/", orderService, logger)
+	if err != nil {
+		logger.Error("failed to connect to nats-streaming", zap.Error(err))
+	}
+
+	if nats != nil {
+		err = nats.OrderProcessingRun()
+		if err != nil {
+			logger.Error("failed to run order processing", zap.Error(err))
+		}
+	}
 
 	requestLogger := middleware.InitRequestLogger(logger)
+	cacheMiddleware := middleware.NewCacheMiddleware(cache, logger)
+
 	e := echo.New()
 
 	e.Use(requestLogger.RequestLogger())
 
-	handlers.NewOrderHandler(e, orderService, logger)
+	handlers.NewOrderHandler(e, orderService, cacheMiddleware, logger)
 
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 

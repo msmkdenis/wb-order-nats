@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"context"
-	"github.com/labstack/echo/v4"
-	"github.com/msmkdenis/wb-order-nats/internal/model"
-	"go.uber.org/zap"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+
+	"github.com/msmkdenis/wb-order-nats/internal/middleware"
+	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
 type OrderService interface {
@@ -16,17 +19,19 @@ type OrderService interface {
 
 type OrderHandler struct {
 	orderService OrderService
+	cache        *middleware.CacheMiddleware
 	logger       *zap.Logger
 }
 
-func NewOrderHandler(e *echo.Echo, service OrderService, logger *zap.Logger) *OrderHandler {
+func NewOrderHandler(e *echo.Echo, service OrderService, cache *middleware.CacheMiddleware, logger *zap.Logger) *OrderHandler {
 	handler := &OrderHandler{
 		orderService: service,
+		cache:        cache,
 		logger:       logger,
 	}
 
 	e.POST("/api/v1/order", handler.SaveOrder)
-	e.GET("/api/v1/order/:orderId", handler.FindOrderById)
+	e.GET("/api/v1/order/:orderId", handler.FindOrderById, cache.GetFromCache())
 	e.GET("/api/v1/order/", handler.FindAll)
 
 	return handler

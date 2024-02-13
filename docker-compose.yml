@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  nats:
+    container_name: nats
+    image: "nats-streaming:0.25.5-alpine"
+    restart: "always"
+    ports:
+      - "127.0.0.1:4222:4222"

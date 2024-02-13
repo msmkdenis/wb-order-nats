@@ -13,14 +13,21 @@ type OrderRepository interface {
 	SelectAll(ctx context.Context) ([]model.Order, error)
 }
 
+type CacheSetter interface {
+	SetOrder(key string, value model.Order)
+	RestoreCache(orders []model.Order)
+}
+
 type OrderUseCase struct {
 	repository OrderRepository
+	cache      CacheSetter
 	logger     *zap.Logger
 }
 
-func NewOrderUseCase(repository OrderRepository, logger *zap.Logger) *OrderUseCase {
+func NewOrderUseCase(repository OrderRepository, cache CacheSetter, logger *zap.Logger) *OrderUseCase {
 	return &OrderUseCase{
 		repository: repository,
+		cache:      cache,
 		logger:     logger,
 	}
 }
@@ -30,13 +37,31 @@ func (o *OrderUseCase) Save(ctx context.Context, order model.Order) error {
 	if err != nil {
 		return err
 	}
+
+	o.cache.SetOrder(order.OrderUID, order)
 	return nil
 }
 
 func (o *OrderUseCase) FindById(ctx context.Context, orderId string) (*model.Order, error) {
-	return o.repository.SelectById(ctx, orderId)
+	order, err := o.repository.SelectById(ctx, orderId)
+	if err != nil {
+		return nil, err
+	}
+
+	o.cache.SetOrder(orderId, *order)
+	return order, nil
 }
 
 func (o *OrderUseCase) FindAll(ctx context.Context) ([]model.Order, error) {
 	return o.repository.SelectAll(ctx)
+}
+
+func (o *OrderUseCase) RestoreCache() error {
+	orders, err := o.repository.SelectAll(context.Background())
+	if err != nil {
+		return err
+	}
+
+	o.cache.RestoreCache(orders)
+	return nil
 }
