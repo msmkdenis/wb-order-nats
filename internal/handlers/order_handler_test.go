@@ -1,4 +1,4 @@
-package integration_test
+package handlers
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"github.com/msmkdenis/wb-order-nats/internal/cache/memory"
 	"github.com/msmkdenis/wb-order-nats/internal/config"
 	"github.com/msmkdenis/wb-order-nats/internal/consumer"
-	"github.com/msmkdenis/wb-order-nats/internal/handlers"
 	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 	"github.com/msmkdenis/wb-order-nats/internal/middleware"
 	"github.com/msmkdenis/wb-order-nats/internal/model"
@@ -34,8 +33,8 @@ var cfgMock = &config.Config{}
 
 type IntegrationTestSuite struct {
 	suite.Suite
-	orderHandler           *handlers.OrderHandler
-	statisticsHandler      *handlers.StatisticsHandler
+	orderHandler           *OrderHandler
+	statisticsHandler      *StatisticsHandler
 	orderService           *service.OrderUseCase
 	orderRepository        *repository.OrderRepository
 	cache                  *memory.Cache
@@ -107,8 +106,8 @@ func (s *IntegrationTestSuite) SetupTest() {
 
 	s.echo = echo.New()
 
-	s.orderHandler = handlers.NewOrderHandler(s.echo, s.orderService, cacheMiddleware, logger)
-	s.statisticsHandler = handlers.NewStatisticsHandler(s.echo, statService, logger)
+	s.orderHandler = NewOrderHandler(s.echo, s.orderService, cacheMiddleware, logger)
+	s.statisticsHandler = NewStatisticsHandler(s.echo, statService, logger)
 }
 
 func (s *IntegrationTestSuite) TestAB() {
@@ -125,7 +124,7 @@ func (s *IntegrationTestSuite) TestAB() {
 	assert.Eventually(s.T(), func() bool {
 		err := s.statisticsHandler.GetStats(cstat)
 		assert.NoError(s.T(), err)
-		var stat []handlers.MessageStat
+		var stat []MessageStat
 		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
 		assert.NoError(s.T(), err)
 		assert.Equal(s.T(), 100, len(stat))
