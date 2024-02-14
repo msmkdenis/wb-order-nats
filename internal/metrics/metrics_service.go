@@ -2,13 +2,14 @@ package metrics
 
 import (
 	"context"
-	"go.uber.org/zap"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type MessageStat struct {
-	Id        string    `json:"id"`
+	ID        string    `json:"id"`
 	Status    string    `json:"status"`
 	Message   string    `json:"message"`
 	Processed time.Time `json:"processed"`
@@ -35,21 +36,10 @@ func (m *MessageStatsUseCase) PushStats(message MessageStat) {
 }
 
 func (m *MessageStatsUseCase) ProcessedMessagesRun(ctx context.Context) {
-
 	for msg := range m.processedMessages {
 		m.mu.Lock()
-		if _, ok := m.statistics[msg.Id]; ok {
-			m.statistics[msg.Id] = append(m.statistics[msg.Id], msg)
-		} else {
-			m.statistics[msg.Id] = []MessageStat{msg}
-		}
+		m.statistics[msg.ID] = append(m.statistics[msg.ID], msg)
 		m.mu.Unlock()
-	}
-
-	select {
-	case <-ctx.Done():
-		m.logger.Info("collecting metrics shutdown", zap.Error(ctx.Err()))
-		return
 	}
 }
 

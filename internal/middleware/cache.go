@@ -2,8 +2,9 @@ package middleware
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/msmkdenis/wb-order-nats/internal/model"
 	"go.uber.org/zap"
+
+	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
 type CacheGetter interface {
@@ -25,8 +26,8 @@ func NewCacheMiddleware(cache CacheGetter, logger *zap.Logger) *CacheMiddleware 
 func (m *CacheMiddleware) GetFromCache() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			orderId := c.Param("orderId")
-			order, ok := m.cache.GetOrder(orderId)
+			orderID := c.Param("orderID")
+			order, ok := m.cache.GetOrder(orderID)
 			if !ok {
 				c.Response().Header().Set("X-Cache", "None")
 				return next(c)

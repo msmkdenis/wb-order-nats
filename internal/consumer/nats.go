@@ -3,12 +3,13 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"github.com/msmkdenis/wb-order-nats/internal/metrics"
-	"github.com/msmkdenis/wb-order-nats/internal/model"
+	"time"
+
 	"github.com/nats-io/stan.go"
 	"go.uber.org/zap"
-	"time"
+
+	"github.com/msmkdenis/wb-order-nats/internal/metrics"
+	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
 type OrderService interface {
@@ -46,9 +47,8 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 func (n *NatsClient) OrderProcessingRun() error {
 	for i := 0; i < 5; i++ {
 		go func() {
-			ss, err := n.client.QueueSubscribe("orders", "test-queue", n.consumeOrder(), stan.DurableName("test-durable"),
+			_, err := n.client.QueueSubscribe("orders", "test-queue", n.consumeOrder(), stan.DurableName("test-durable"),
 				stan.DeliverAllAvailable(), stan.MaxInflight(20))
-			fmt.Println(ss.IsValid())
 			if err != nil {
 				n.logger.Info("error", zap.Error(err))
 				if n.client.Close() != nil {
@@ -65,7 +65,6 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 	return func(msg *stan.Msg) {
 		var order model.Order
 		err := json.Unmarshal(msg.Data, &order)
-		fmt.Println("received not saved", order)
 		if err != nil {
 			n.logger.Info("error", zap.Error(err))
 		} else {
@@ -83,7 +82,7 @@ func (n *NatsClient) WorkerSaveRun() {
 					n.logger.Info("error", zap.Error(err))
 					go func(order model.Order) {
 						m := metrics.MessageStat{
-							Id:        order.OrderUID,
+							ID:        order.OrderUID,
 							Status:    "error",
 							Message:   err.Error(),
 							Processed: time.Now().UTC(),
@@ -95,7 +94,7 @@ func (n *NatsClient) WorkerSaveRun() {
 				n.logger.Info("saved", zap.String("id", order.OrderUID))
 				go func(order model.Order) {
 					m := metrics.MessageStat{
-						Id:        order.OrderUID,
+						ID:        order.OrderUID,
 						Status:    "processed",
 						Message:   "ok",
 						Processed: time.Now().UTC(),

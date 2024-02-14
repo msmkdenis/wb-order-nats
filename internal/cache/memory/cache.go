@@ -1,9 +1,11 @@
 package memory
 
 import (
-	"github.com/msmkdenis/wb-order-nats/internal/model"
-	"go.uber.org/zap"
 	"sync"
+
+	"go.uber.org/zap"
+
+	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
 type Cache struct {

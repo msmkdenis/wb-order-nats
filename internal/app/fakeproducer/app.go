@@ -3,12 +3,14 @@ package fakeproducer
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/brianvoe/gofakeit/v6"
-	"github.com/msmkdenis/wb-order-nats/internal/model"
-	"github.com/nats-io/stan.go"
-	"go.uber.org/zap"
 	"strconv"
 	"time"
+
+	"github.com/brianvoe/gofakeit/v6"
+	"github.com/nats-io/stan.go"
+	"go.uber.org/zap"
+
+	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
 func Run(cluster string, clientID string, natsURL string, count int) {
@@ -31,8 +33,7 @@ func Run(cluster string, clientID string, natsURL string, count int) {
 	for i := 0; i < count; i++ {
 		order := newFakeOrder()
 		or, _ := json.Marshal(order)
-		uuid, err := sc.PublishAsync("orders", or, ackHandler) // returns immediately
-		fmt.Println("Published:", uuid, "Error:", err)
+		_, err := sc.PublishAsync("orders", or, ackHandler) // returns immediately
 		if err != nil {
 			logger.Error("Error publishing", zap.Error(err))
 		}

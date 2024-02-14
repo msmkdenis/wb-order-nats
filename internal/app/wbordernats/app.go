@@ -3,7 +3,6 @@ package wbordernats
 import (
 	"context"
 	"errors"
-	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/msmkdenis/wb-order-nats/internal/config"
 	"github.com/msmkdenis/wb-order-nats/internal/consumer"
 	"github.com/msmkdenis/wb-order-nats/internal/handlers"
+	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 	"github.com/msmkdenis/wb-order-nats/internal/middleware"
 	"github.com/msmkdenis/wb-order-nats/internal/repository"
 	"github.com/msmkdenis/wb-order-nats/internal/service"

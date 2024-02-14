@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 	"go.uber.org/zap"
+
+	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 )
 
 type MessageStat struct {
-	Id       string                `json:"id"`
+	ID       string                `json:"id"`
 	Messages []metrics.MessageStat `json:"messages"`
 }
 
@@ -33,10 +34,10 @@ func NewStatisticsHandler(e *echo.Echo, service StatisticsGetter, logger *zap.Lo
 
 func (h *StatisticsHandler) GetStats(c echo.Context) error {
 	stat := h.statGetter.GetStats()
-	var stats []MessageStat
+	stats := make([]MessageStat, 0, len(stat))
 	for key, value := range stat {
 		stats = append(stats, MessageStat{
-			Id:       key,
+			ID:       key,
 			Messages: value,
 		})
 	}

@@ -13,7 +13,7 @@ import (
 
 type OrderService interface {
 	Save(ctx context.Context, order model.Order) error
-	FindById(ctx context.Context, orderId string) (*model.Order, error)
+	FindByID(ctx context.Context, orderID string) (*model.Order, error)
 	FindAll(ctx context.Context) ([]model.Order, error)
 }
 
@@ -31,7 +31,7 @@ func NewOrderHandler(e *echo.Echo, service OrderService, cache *middleware.Cache
 	}
 
 	e.POST("/api/v1/order", handler.SaveOrder)
-	e.GET("/api/v1/order/:orderId", handler.FindOrderById, cache.GetFromCache())
+	e.GET("/api/v1/order/:orderId", handler.FindOrderByID, cache.GetFromCache())
 	e.GET("/api/v1/order/", handler.FindAll)
 
 	return handler
@@ -61,10 +61,10 @@ func (h *OrderHandler) SaveOrder(c echo.Context) error {
 	return c.JSON(200, order)
 }
 
-func (h *OrderHandler) FindOrderById(c echo.Context) error {
-	orderId := c.Param("orderId")
+func (h *OrderHandler) FindOrderByID(c echo.Context) error {
+	orderID := c.Param("orderID")
 
-	order, err := h.orderService.FindById(context.Background(), orderId)
+	order, err := h.orderService.FindByID(context.Background(), orderID)
 	if err != nil {
 		h.logger.Error("error", zap.Error(err))
 		return c.JSON(http.StatusInternalServerError, map[string]string{"Error": err.Error()})

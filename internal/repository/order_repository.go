@@ -51,7 +51,7 @@ func (r *OrderRepository) Insert(ctx context.Context, o model.Order) error {
 		r.logger.Info("Error while staring transaction", zap.String("error", err.Error()))
 		return err
 	}
-	defer tx.Rollback(context.Background())
+	defer tx.Rollback(context.Background()) //nolint:errcheck
 
 	order, err := tx.Prepare(context.Background(), "insertOrder", insertOrder)
 	if err != nil {
@@ -102,8 +102,8 @@ func (r *OrderRepository) Insert(ctx context.Context, o model.Order) error {
 	return nil
 }
 
-func (r *OrderRepository) SelectById(ctx context.Context, orderId string) (*model.Order, error) {
-	rows, err := r.postgresPool.DB.Query(ctx, selectFullOrder, orderId)
+func (r *OrderRepository) SelectByID(ctx context.Context, orderID string) (*model.Order, error) {
+	rows, err := r.postgresPool.DB.Query(ctx, selectFullOrder, orderID)
 	if err != nil {
 		r.logger.Info("error", zap.Error(err))
 		return nil, err

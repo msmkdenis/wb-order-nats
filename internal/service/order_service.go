@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/msmkdenis/wb-order-nats/internal/model"
@@ -9,7 +10,7 @@ import (
 
 type OrderRepository interface {
 	Insert(ctx context.Context, order model.Order) error
-	SelectById(ctx context.Context, orderId string) (*model.Order, error)
+	SelectByID(ctx context.Context, orderID string) (*model.Order, error)
 	SelectAll(ctx context.Context) ([]model.Order, error)
 }
 
@@ -42,13 +43,13 @@ func (o *OrderUseCase) Save(ctx context.Context, order model.Order) error {
 	return nil
 }
 
-func (o *OrderUseCase) FindById(ctx context.Context, orderId string) (*model.Order, error) {
-	order, err := o.repository.SelectById(ctx, orderId)
+func (o *OrderUseCase) FindByID(ctx context.Context, orderID string) (*model.Order, error) {
+	order, err := o.repository.SelectByID(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 
-	o.cache.SetOrder(orderId, *order)
+	o.cache.SetOrder(orderID, *order)
 	return order, nil
 }
 

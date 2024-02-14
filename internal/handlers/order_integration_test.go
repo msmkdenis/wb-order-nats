@@ -4,10 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/docker/go-connections/nat"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"go.uber.org/zap"
+
 	"github.com/msmkdenis/wb-order-nats/internal/app/fakeproducer"
 	"github.com/msmkdenis/wb-order-nats/internal/cache/memory"
 	"github.com/msmkdenis/wb-order-nats/internal/config"
@@ -18,15 +29,6 @@ import (
 	"github.com/msmkdenis/wb-order-nats/internal/repository"
 	"github.com/msmkdenis/wb-order-nats/internal/service"
 	"github.com/msmkdenis/wb-order-nats/internal/storage/db"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/wait"
-	"go.uber.org/zap"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 var cfgMock = &config.Config{}
@@ -95,7 +97,6 @@ func (s *IntegrationTestSuite) SetupTest() {
 	}
 
 	if s.natsClient != nil {
-		fmt.Println("NATS-STREAMING START RUNNING")
 		err = s.natsClient.OrderProcessingRun()
 		if err != nil {
 			logger.Error("failed to run order processing", zap.Error(err))
@@ -113,28 +114,37 @@ func (s *IntegrationTestSuite) SetupTest() {
 func (s *IntegrationTestSuite) TestAB() {
 	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 100)
 
+	orderAllReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
+	orderAllRec := httptest.NewRecorder()
+	cAllOrder := s.echo.NewContext(orderAllReq, orderAllRec)
+
+	statReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil)
+	statRec := httptest.NewRecorder()
+	cStat := s.echo.NewContext(statReq, statRec)
+
 	orderReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
 	orderRec := httptest.NewRecorder()
 	cOrder := s.echo.NewContext(orderReq, orderRec)
 
-	statReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil)
-	statRec := httptest.NewRecorder()
-	cstat := s.echo.NewContext(statReq, statRec)
-
 	assert.Eventually(s.T(), func() bool {
-		err := s.statisticsHandler.GetStats(cstat)
+		err := s.statisticsHandler.GetStats(cStat)
 		assert.NoError(s.T(), err)
 		var stat []MessageStat
 		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
 		assert.NoError(s.T(), err)
 		assert.Equal(s.T(), 100, len(stat))
-		fmt.Println("=======================")
-		fmt.Println(len(stat))
 
 		var success int
 		var fail int
+		var flag bool
+		var id string
 		for _, v := range stat {
 			for _, vv := range v.Messages {
+				if vv.Status == "processed" && !flag { //nolint:goconst
+					id = vv.ID
+					flag = true
+				}
+
 				if vv.Status == "processed" {
 					success++
 				}
@@ -144,21 +154,28 @@ func (s *IntegrationTestSuite) TestAB() {
 			}
 		}
 
-		err = s.orderHandler.FindAll(cOrder)
+		err = s.orderHandler.FindAll(cAllOrder)
 		assert.NoError(s.T(), err)
 		var orders []model.Order
-		_ = json.Unmarshal(orderRec.Body.Bytes(), &orders)
-		fmt.Println("=======================")
-		fmt.Println(success)
-		fmt.Println(fail)
-		fmt.Println(len(orders))
+		_ = json.Unmarshal(orderAllRec.Body.Bytes(), &orders)
+
+		cOrder.SetPath("/:orderID")
+		cOrder.SetParamNames("orderID")
+		cOrder.SetParamValues(id)
+
+		err = s.orderHandler.FindOrderByID(cOrder)
+		assert.NoError(s.T(), err)
+		var order model.Order
+		err = json.Unmarshal(orderRec.Body.Bytes(), &order)
+		assert.NoError(s.T(), err)
+
 		return len(orders) == success-fail
 	}, 10*time.Second, 2*time.Second)
 }
 
 func (s *IntegrationTestSuite) TearDownTest() {
-	s.postgresContainer.Terminate(context.Background())
-	s.natsStreamingContainer.Terminate(context.Background())
+	s.postgresContainer.Terminate(context.Background())      //nolint:errcheck
+	s.natsStreamingContainer.Terminate(context.Background()) //nolint:errcheck
 }
 
 func setupTestNatsStreaming(logger *zap.Logger) (testcontainers.Container, error) {
