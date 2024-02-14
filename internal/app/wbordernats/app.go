@@ -3,6 +3,7 @@ package wbordernats
 import (
 	"context"
 	"errors"
+	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 	"log"
 	"net/http"
 	"os"
@@ -39,7 +40,10 @@ func Run(quitSignal chan os.Signal) {
 		logger.Error("failed to restore cache", zap.Error(err))
 	}
 
-	nats, err := consumer.NewNatsClient("test-cluster", "test-client", "http://127.0.0.1:4222/", orderService, logger)
+	statService := metrics.NewMessageStatsUseCase(logger)
+	go statService.ProcessedMessagesRun(context.Background())
+
+	nats, err := consumer.NewNatsClient("test-cluster", "test-client", "http://127.0.0.1:4222/", orderService, statService, logger)
 	if err != nil {
 		logger.Error("failed to connect to nats-streaming", zap.Error(err))
 	}
@@ -59,6 +63,7 @@ func Run(quitSignal chan os.Signal) {
 	e.Use(requestLogger.RequestLogger())
 
 	handlers.NewOrderHandler(e, orderService, cacheMiddleware, logger)
+	handlers.NewStatisticsHandler(e, statService, logger)
 
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 

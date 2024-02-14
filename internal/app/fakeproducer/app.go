@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func Run(cluster string, clientID string, natsURL string) {
+func Run(cluster string, clientID string, natsURL string, count int) {
 	logger, _ := zap.NewProduction()
 
 	ackHandler := func(ackedNuid string, err error) {
@@ -28,7 +28,7 @@ func Run(cluster string, clientID string, natsURL string) {
 		return
 	}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < count; i++ {
 		order := newFakeOrder()
 		or, _ := json.Marshal(order)
 		uuid, err := sc.PublishAsync("orders", or, ackHandler) // returns immediately

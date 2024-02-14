@@ -13,6 +13,7 @@ import (
 	"github.com/msmkdenis/wb-order-nats/internal/config"
 	"github.com/msmkdenis/wb-order-nats/internal/consumer"
 	"github.com/msmkdenis/wb-order-nats/internal/handlers"
+	"github.com/msmkdenis/wb-order-nats/internal/metrics"
 	"github.com/msmkdenis/wb-order-nats/internal/middleware"
 	"github.com/msmkdenis/wb-order-nats/internal/model"
 	"github.com/msmkdenis/wb-order-nats/internal/repository"
@@ -26,6 +27,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 var cfgMock = &config.Config{}
@@ -33,6 +35,7 @@ var cfgMock = &config.Config{}
 type IntegrationTestSuite struct {
 	suite.Suite
 	orderHandler           *handlers.OrderHandler
+	statisticsHandler      *handlers.StatisticsHandler
 	orderService           *service.OrderUseCase
 	orderRepository        *repository.OrderRepository
 	cache                  *memory.Cache
@@ -83,8 +86,11 @@ func (s *IntegrationTestSuite) SetupTest() {
 		logger.Error("Unable to get nats port", zap.Error(err))
 	}
 
+	statService := metrics.NewMessageStatsUseCase(logger)
+	go statService.ProcessedMessagesRun(context.Background())
+
 	s.natsClient, err = consumer.NewNatsClient("test-cluster", "test-consumer",
-		fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), s.orderService, logger)
+		fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), s.orderService, statService, logger)
 	if err != nil {
 		logger.Error("failed to connect to nats-streaming", zap.Error(err))
 	}
@@ -102,22 +108,53 @@ func (s *IntegrationTestSuite) SetupTest() {
 	s.echo = echo.New()
 
 	s.orderHandler = handlers.NewOrderHandler(s.echo, s.orderService, cacheMiddleware, logger)
+	s.statisticsHandler = handlers.NewStatisticsHandler(s.echo, statService, logger)
 }
 
 func (s *IntegrationTestSuite) TestAB() {
-	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()))
+	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 100)
 
-	//time.Sleep(time.Second * 4)
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/", nil)
-	rec := httptest.NewRecorder()
+	orderReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
+	orderRec := httptest.NewRecorder()
+	cOrder := s.echo.NewContext(orderReq, orderRec)
 
-	c := s.echo.NewContext(req, rec)
+	statReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil)
+	statRec := httptest.NewRecorder()
+	cstat := s.echo.NewContext(statReq, statRec)
 
-	err := s.orderHandler.FindAll(c)
-	assert.NoError(s.T(), err)
-	var orders []model.Order
-	_ = json.Unmarshal(rec.Body.Bytes(), &orders)
-	fmt.Println(len(orders))
+	assert.Eventually(s.T(), func() bool {
+		err := s.statisticsHandler.GetStats(cstat)
+		assert.NoError(s.T(), err)
+		var stat []handlers.MessageStat
+		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
+		assert.NoError(s.T(), err)
+		assert.Equal(s.T(), 100, len(stat))
+		fmt.Println("=======================")
+		fmt.Println(len(stat))
+
+		var success int
+		var fail int
+		for _, v := range stat {
+			for _, vv := range v.Messages {
+				if vv.Status == "processed" {
+					success++
+				}
+				if vv.Status == "error" {
+					fail++
+				}
+			}
+		}
+
+		err = s.orderHandler.FindAll(cOrder)
+		assert.NoError(s.T(), err)
+		var orders []model.Order
+		_ = json.Unmarshal(orderRec.Body.Bytes(), &orders)
+		fmt.Println("=======================")
+		fmt.Println(success)
+		fmt.Println(fail)
+		fmt.Println(len(orders))
+		return len(orders) == success-fail
+	}, 10*time.Second, 2*time.Second)
 }
 
 func (s *IntegrationTestSuite) TearDownTest() {
@@ -142,11 +179,6 @@ func setupTestNatsStreaming(logger *zap.Logger) (testcontainers.Container, error
 		logger.Info("error", zap.Error(err))
 		return nil, err
 	}
-
-	fmt.Println("===========================")
-	host, _ := natsContainer.Host(context.Background())
-	fmt.Println(host)
-	fmt.Println("===========================")
 
 	return natsContainer, nil
 }

@@ -6,3 +6,10 @@ services:
     restart: "always"
     ports:
       - "127.0.0.1:4222:4222"
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always

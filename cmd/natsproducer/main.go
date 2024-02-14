@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	fakeproducer.Run("test-cluster", "test-client-sender", "http://127.0.0.1:4222/")
+	fakeproducer.Run("test-cluster", "test-client-sender", "http://127.0.0.1:4222/", 100)
 }
