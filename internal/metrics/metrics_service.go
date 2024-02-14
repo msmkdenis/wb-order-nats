@@ -54,5 +54,10 @@ func (m *MessageStatsUseCase) ProcessedMessagesRun(ctx context.Context) {
 }
 
 func (m *MessageStatsUseCase) GetStats() map[string][]MessageStat {
-	return m.statistics
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	stats := m.statistics
+
+	return stats
 }
