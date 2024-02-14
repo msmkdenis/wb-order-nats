@@ -17,7 +17,7 @@ type MessageStat struct {
 
 type MessageStatsUseCase struct {
 	statistics        map[string][]MessageStat
-	mu                sync.RWMutex
+	mu                *sync.RWMutex
 	logger            *zap.Logger
 	processedMessages chan MessageStat
 }
@@ -25,7 +25,7 @@ type MessageStatsUseCase struct {
 func NewMessageStatsUseCase(logger *zap.Logger) *MessageStatsUseCase {
 	return &MessageStatsUseCase{
 		statistics:        make(map[string][]MessageStat),
-		mu:                sync.RWMutex{},
+		mu:                &sync.RWMutex{},
 		logger:            logger,
 		processedMessages: make(chan MessageStat),
 	}

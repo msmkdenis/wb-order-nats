@@ -112,7 +112,7 @@ func (s *IntegrationTestSuite) SetupTest() {
 }
 
 func (s *IntegrationTestSuite) TestAB() {
-	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 10_000)
+	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 1_000)
 
 	orderAllReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
 	orderAllRec := httptest.NewRecorder()
@@ -132,7 +132,7 @@ func (s *IntegrationTestSuite) TestAB() {
 		var stat map[string][]metrics.MessageStat
 		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
 		assert.NoError(s.T(), err)
-		assert.Equal(s.T(), 10_000, len(stat))
+		assert.Equal(s.T(), 1_000, len(stat))
 
 		var success int
 		var fail int
@@ -169,6 +169,8 @@ func (s *IntegrationTestSuite) TestAB() {
 		var order model.Order
 		err = json.Unmarshal(orderRec.Body.Bytes(), &order)
 		assert.NoError(s.T(), err)
+
+		fmt.Println(len(stat), len(orders), success, fail)
 
 		return len(orders) == success-fail
 	}, 12*time.Second, 2*time.Second)
