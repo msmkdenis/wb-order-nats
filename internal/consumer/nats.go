@@ -45,7 +45,7 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 }
 
 func (n *NatsClient) OrderProcessingRun() error {
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 20; i++ {
 		go func() {
 			_, err := n.client.QueueSubscribe("orders", "test-queue", n.consumeOrder(), stan.DurableName("test-durable"),
 				stan.DeliverAllAvailable(), stan.MaxInflight(20))
@@ -74,7 +74,7 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 }
 
 func (n *NatsClient) WorkerSaveRun() {
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 200; i++ {
 		go func() {
 			for order := range n.ordersChan {
 				err := n.os.Save(context.Background(), order)

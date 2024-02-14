@@ -112,7 +112,7 @@ func (s *IntegrationTestSuite) SetupTest() {
 }
 
 func (s *IntegrationTestSuite) TestAB() {
-	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 100)
+	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 10_000)
 
 	orderAllReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
 	orderAllRec := httptest.NewRecorder()
@@ -129,26 +129,27 @@ func (s *IntegrationTestSuite) TestAB() {
 	assert.Eventually(s.T(), func() bool {
 		err := s.statisticsHandler.GetStats(cStat)
 		assert.NoError(s.T(), err)
-		var stat []MessageStat
+		var stat map[string][]metrics.MessageStat
 		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
 		assert.NoError(s.T(), err)
-		assert.Equal(s.T(), 100, len(stat))
+		assert.Equal(s.T(), 10_000, len(stat))
 
 		var success int
 		var fail int
 		var flag bool
 		var id string
+
 		for _, v := range stat {
-			for _, vv := range v.Messages {
-				if vv.Status == "processed" && !flag { //nolint:goconst
-					id = vv.ID
+			for _, vs := range v {
+				if vs.Status == "processed" && !flag { //nolint:goconst
+					id = vs.ID
 					flag = true
 				}
 
-				if vv.Status == "processed" {
+				if vs.Status == "processed" {
 					success++
 				}
-				if vv.Status == "error" {
+				if vs.Status == "error" {
 					fail++
 				}
 			}
@@ -170,7 +171,7 @@ func (s *IntegrationTestSuite) TestAB() {
 		assert.NoError(s.T(), err)
 
 		return len(orders) == success-fail
-	}, 10*time.Second, 2*time.Second)
+	}, 12*time.Second, 2*time.Second)
 }
 
 func (s *IntegrationTestSuite) TearDownTest() {
