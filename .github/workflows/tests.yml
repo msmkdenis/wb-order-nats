@@ -9,17 +9,19 @@ on:
 
 jobs:
 
-  linters:
+  lint:
+    name: golangci-lint
     runs-on: ubuntu-latest
-    container: golang:1.21
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Install golangci-lint
-        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.56.1
-      - name: Run linters
-        run: golangci-lint run
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.53
+          # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
+          # install-mode: "goinstall"
 
   wb-order-nats-tests:
     runs-on: ubuntu-latest
