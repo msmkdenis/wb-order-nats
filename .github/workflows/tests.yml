@@ -8,6 +8,17 @@ on:
       - develop
 
 jobs:
+
+  linters:
+    runs-on: ubuntu-latest
+    container: golangci/golangci-lint:v1.52.2
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run linters
+        run: golangci-lint run
+
   wb-order-nats-tests:
     runs-on: ubuntu-latest
     container: golang:1.21
