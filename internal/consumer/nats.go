@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/nats-io/stan.go"
@@ -29,6 +30,7 @@ type NatsClient struct {
 }
 
 func NewNatsClient(cluster string, clientID string, natsURL string, service OrderService, sp StatisticsPusher, logger *zap.Logger) (*NatsClient, error) {
+	fmt.Println(cluster, clientID, natsURL)
 	client, err := stan.Connect(cluster, clientID, stan.NatsURL(natsURL))
 	if err != nil {
 		logger.Info("error", zap.Error(err))
@@ -44,10 +46,10 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 	}, nil
 }
 
-func (n *NatsClient) OrderProcessingRun() error {
+func (n *NatsClient) OrderProcessingRun(subject string, qGroup string, durable string) error {
 	for i := 0; i < 10; i++ {
 		go func() {
-			_, err := n.client.QueueSubscribe("orders", "test-queue", n.consumeOrder(), stan.DurableName("test-durable"),
+			_, err := n.client.QueueSubscribe(subject, qGroup, n.consumeOrder(), stan.DurableName(durable),
 				stan.DeliverAllAvailable(), stan.MaxInflight(20))
 			if err != nil {
 				n.logger.Info("error", zap.Error(err))

@@ -1,4 +1,4 @@
-package wbordernats
+package wborder
 
 import (
 	"context"
@@ -23,13 +23,13 @@ import (
 )
 
 func Run(quitSignal chan os.Signal) {
-	cfg := *config.NewConfig()
+	cfg := config.NewConfig()
 	logger, err := zap.NewProduction()
 	if err != nil {
 		log.Fatal("Unable to initialize zap logger", err)
 	}
 
-	postgresPool := initPostgresPool(&cfg, logger)
+	postgresPool := initPostgresPool(cfg, logger)
 
 	orderRepository := repository.NewOrderRepository(postgresPool, logger)
 	cache := memory.NewCache(logger)
@@ -43,13 +43,13 @@ func Run(quitSignal chan os.Signal) {
 	statService := metrics.NewMessageStatsUseCase(logger)
 	go statService.ProcessedMessagesRun(context.Background())
 
-	nats, err := consumer.NewNatsClient("test-cluster", "test-client", "http://127.0.0.1:4222/", orderService, statService, logger)
+	nats, err := consumer.NewNatsClient(cfg.NatsCluster, cfg.NatsClient, cfg.NatsURL, orderService, statService, logger)
 	if err != nil {
 		logger.Error("failed to connect to nats-streaming", zap.Error(err))
 	}
 
 	if nats != nil {
-		err = nats.OrderProcessingRun()
+		err = nats.OrderProcessingRun(cfg.NatsSubject, cfg.NatsQGroup, cfg.NatsDurable)
 		if err != nil {
 			logger.Error("failed to run order processing", zap.Error(err))
 		}

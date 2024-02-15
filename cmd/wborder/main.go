@@ -7,11 +7,11 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 
-	"github.com/msmkdenis/wb-order-nats/internal/app/wbordernats"
+	"github.com/msmkdenis/wb-order-nats/internal/app/wborder"
 )
 
 func main() {
 	quitSignal := make(chan os.Signal, 1)
 	signal.Notify(quitSignal, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	wbordernats.Run(quitSignal)
+	wborder.Run(quitSignal)
 }

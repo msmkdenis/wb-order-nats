@@ -19,7 +19,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 	"go.uber.org/zap"
 
-	"github.com/msmkdenis/wb-order-nats/internal/app/fakeproducer"
+	"github.com/msmkdenis/wb-order-nats/internal/app/natsproducer"
 	"github.com/msmkdenis/wb-order-nats/internal/cache/memory"
 	"github.com/msmkdenis/wb-order-nats/internal/config"
 	"github.com/msmkdenis/wb-order-nats/internal/consumer"
@@ -37,7 +37,7 @@ type IntegrationTestSuite struct {
 	suite.Suite
 	orderHandler           *OrderHandler
 	statisticsHandler      *StatisticsHandler
-	producerHandler        *fakeproducer.ProducerHandler
+	producerHandler        *natsproducer.ProducerHandler
 	orderService           *service.OrderUseCase
 	orderRepository        *repository.OrderRepository
 	cache                  *memory.Cache
@@ -98,7 +98,7 @@ func (s *IntegrationTestSuite) SetupTest() {
 	}
 
 	if s.natsClient != nil {
-		err = s.natsClient.OrderProcessingRun()
+		err = s.natsClient.OrderProcessingRun("orders", "test-queue", "test-durable")
 		if err != nil {
 			logger.Error("failed to run order processing", zap.Error(err))
 		}
@@ -111,8 +111,8 @@ func (s *IntegrationTestSuite) SetupTest() {
 	s.orderHandler = NewOrderHandler(s.echo, s.orderService, cacheMiddleware, logger)
 	s.statisticsHandler = NewStatisticsHandler(s.echo, statService, logger)
 
-	producer := fakeproducer.New("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), logger)
-	s.producerHandler = fakeproducer.NewProducerHandler(s.echo, producer, logger)
+	producer := natsproducer.New("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), logger)
+	s.producerHandler = natsproducer.NewProducerHandler(s.echo, producer, logger)
 }
 
 func (s *IntegrationTestSuite) TestProcessedMessagesCount() {

@@ -1,35 +1,50 @@
-package fakeproducer
+package natsproducer
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/gommon/log"
 	"github.com/nats-io/stan.go"
 	"go.uber.org/zap"
 
 	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
-const (
-	cluster  = "test-cluster"
-	clientID = "test-sender"
-	natsURL  = "http://127.0.0.1:4222"
-	servAddr = "127.0.0.1:6000"
-)
+type producerConfig struct {
+	Cluster    string
+	Client     string
+	NatsURL    string
+	ServerAddr string
+}
 
 func Run() {
+	err := godotenv.Load("natsproducer.env")
+	if err != nil {
+		log.Info("Error loading .env file, using default values")
+	}
+
+	config := &producerConfig{
+		Cluster:    os.Getenv("NATS_PRODUCER_CLUSTER"),
+		Client:     os.Getenv("NATS_PRODUCER_CLIENT"),
+		NatsURL:    os.Getenv("NATS_PRODUCER_URL"),
+		ServerAddr: os.Getenv("PRODUCER_SERV_ADDR"),
+	}
+
 	logger, _ := zap.NewProduction()
-	producer := New(cluster, clientID, natsURL, logger)
+	producer := New(config.Cluster, config.Client, config.NatsURL, logger)
 	e := echo.New()
 	NewProducerHandler(e, producer, logger)
 
-	errStart := e.Start(servAddr)
+	errStart := e.Start(config.ServerAddr)
 	if errStart != nil && !errors.Is(errStart, http.ErrServerClosed) {
 		logger.Fatal(errStart.Error())
 	}

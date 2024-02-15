@@ -1,8 +1,74 @@
 version: '3.8'
 services:
+  # Message producer service (to NATS streaming)
+  natsproducer:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/natsproducer/Dockerfile
+    image: natsproducer
+    container_name: natsproducer_server
+    restart: always
+    environment:
+      - NATS_PRODUCER_CLUSTER=test-cluster
+      - NATS_PRODUCER_CLIENT=test-sender
+      - NATS_PRODUCER_URL=http://nats:4222/
+      - PRODUCER_SERV_ADDR=natsproducer:6000
+    ports:
+      - "6000:6000"
+    depends_on:
+      - nats
+
+  # Message consumer service (from NATS streaming)
+  wborder:
+    build:
+      context: .
+      dockerfile: ./dockerfiles/wborder/Dockerfile
+    image: wborder
+    container_name: wborder_server
+    restart: always
+    environment:
+      - RUN_ADDRESS=wborder:7000
+      - SERVER_PORTS=7000:7000
+      - NATS_CLUSTER=test-cluster
+      - NATS_CLIENT=test_client
+      - NATS_SUBJECT=orders
+      - NATS_QGROUP=test-queue
+      - NATS_DURABLE=test-durable
+      - NATS_URL=http://nats:4222/
+      - DATABASE_URI=postgres://postgres:postgres@wborder_db:5432/wb-order?sslmode=disable
+    ports:
+      - "7000:7000"
+    depends_on:
+      - nats
+      - wborder_db
+
+  # PostgreSQL
+  wborder_db:
+    image: postgres:15.3
+    container_name: wborder_db
+    restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_PASSWORD}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=wb-order
+    ports:
+      - "5436:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  # NATS Streaming
   nats:
     container_name: nats
     image: "nats-streaming:0.25.5-alpine"
     restart: "always"
     ports:
-      - "127.0.0.1:4222:4222"
+      - "4222:4222"
+
+volumes:
+  pg_data:

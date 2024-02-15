@@ -1,26 +1,38 @@
 package config
 
 import (
-	"flag"
-	"fmt"
+	"os"
 
-	"github.com/caarlos0/env/v10"
+	"github.com/joho/godotenv"
+	"github.com/labstack/gommon/log"
 )
 
 type Config struct {
-	Address     string `env:"RUN_ADDRESS"`
-	DatabaseURI string `env:"DATABASE_URI"`
+	Address     string
+	DatabaseURI string
+	NatsCluster string
+	NatsClient  string
+	NatsURL     string
+	NatsSubject string
+	NatsQGroup  string
+	NatsDurable string
 }
 
 func NewConfig() *Config {
-	config := &Config{}
-
-	flag.StringVar(&config.Address, "a", "localhost:7000", "Адрес и порт запуска сервиса")
-	flag.StringVar(&config.DatabaseURI, "d", "user=postgres password=postgres host=localhost database=wb-order sslmode=disable", "Адрес подключения к базе данных")
-
-	if err := env.Parse(config); err != nil {
-		fmt.Printf("%+v\n", err)
+	err := godotenv.Load("wborder.env")
+	if err != nil {
+		log.Info("Error loading .env file, using default values")
 	}
+
+	config := &Config{}
+	config.Address = os.Getenv("RUN_ADDRESS")
+	config.DatabaseURI = os.Getenv("DATABASE_URI")
+	config.NatsCluster = os.Getenv("NATS_CLUSTER")
+	config.NatsClient = os.Getenv("NATS_CLIENT")
+	config.NatsURL = os.Getenv("NATS_URL")
+	config.NatsSubject = os.Getenv("NATS_SUBJECT")
+	config.NatsQGroup = os.Getenv("NATS_QGROUP")
+	config.NatsDurable = os.Getenv("NATS_DURABLE")
 
 	return config
 }

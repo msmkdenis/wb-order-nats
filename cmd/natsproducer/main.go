@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/msmkdenis/wb-order-nats/internal/app/fakeproducer"
+	"github.com/msmkdenis/wb-order-nats/internal/app/natsproducer"
 )
 
 func main() {
-	fakeproducer.Run()
+	natsproducer.Run()
 }
