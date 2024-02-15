@@ -31,7 +31,7 @@ func NewOrderHandler(e *echo.Echo, service OrderService, cache *middleware.Cache
 	}
 
 	e.POST("/api/v1/order", handler.SaveOrder)
-	e.GET("/api/v1/order/:orderId", handler.FindOrderByID, cache.GetFromCache())
+	e.GET("/api/v1/order/:orderID", handler.FindOrderByID, cache.GetFromCache())
 	e.GET("/api/v1/order/", handler.FindAll)
 
 	return handler

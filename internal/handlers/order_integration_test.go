@@ -37,6 +37,7 @@ type IntegrationTestSuite struct {
 	suite.Suite
 	orderHandler           *OrderHandler
 	statisticsHandler      *StatisticsHandler
+	producerHandler        *fakeproducer.ProducerHandler
 	orderService           *service.OrderUseCase
 	orderRepository        *repository.OrderRepository
 	cache                  *memory.Cache
@@ -109,71 +110,47 @@ func (s *IntegrationTestSuite) SetupTest() {
 
 	s.orderHandler = NewOrderHandler(s.echo, s.orderService, cacheMiddleware, logger)
 	s.statisticsHandler = NewStatisticsHandler(s.echo, statService, logger)
+
+	producer := fakeproducer.New("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), logger)
+	s.producerHandler = fakeproducer.NewProducerHandler(s.echo, producer, logger)
 }
 
-func (s *IntegrationTestSuite) TestAB() {
-	fakeproducer.Run("test-cluster", "test-sender", fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), 1_000)
+func (s *IntegrationTestSuite) TestProcessedMessagesCount() {
+	producerReq := httptest.NewRequest(http.MethodPost, "/api/v1/producer/", nil)
+	producerRec := httptest.NewRecorder()
+	cProducer := s.echo.NewContext(producerReq, producerRec)
+	cProducer.SetPath("/:msgCount")
+	cProducer.SetParamNames("msgCount")
+	cProducer.SetParamValues("10000")
+	err := s.producerHandler.Send(cProducer)
+	assert.NoError(s.T(), err)
 
 	orderAllReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
 	orderAllRec := httptest.NewRecorder()
 	cAllOrder := s.echo.NewContext(orderAllReq, orderAllRec)
 
-	statReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil)
+	statReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats/counts", nil)
 	statRec := httptest.NewRecorder()
 	cStat := s.echo.NewContext(statReq, statRec)
 
-	orderReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
-	orderRec := httptest.NewRecorder()
-	cOrder := s.echo.NewContext(orderReq, orderRec)
-
 	assert.Eventually(s.T(), func() bool {
-		err := s.statisticsHandler.GetStats(cStat)
+		err := s.statisticsHandler.GetStatsCount(cStat)
 		assert.NoError(s.T(), err)
-		var stat map[string][]metrics.MessageStat
+		var stat StatCountsDTO
 		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
 		assert.NoError(s.T(), err)
-		assert.Equal(s.T(), 1_000, len(stat))
-
-		var success int
-		var fail int
-		var flag bool
-		var id string
-
-		for _, v := range stat {
-			for _, vs := range v {
-				if vs.Status == "processed" && !flag { //nolint:goconst
-					id = vs.ID
-					flag = true
-				}
-
-				if vs.Status == "processed" {
-					success++
-				}
-				if vs.Status == "error" {
-					fail++
-				}
-			}
-		}
+		assert.Equal(s.T(), 10_000, stat.Processed)
 
 		err = s.orderHandler.FindAll(cAllOrder)
 		assert.NoError(s.T(), err)
 		var orders []model.Order
-		_ = json.Unmarshal(orderAllRec.Body.Bytes(), &orders)
-
-		cOrder.SetPath("/:orderID")
-		cOrder.SetParamNames("orderID")
-		cOrder.SetParamValues(id)
-
-		err = s.orderHandler.FindOrderByID(cOrder)
-		assert.NoError(s.T(), err)
-		var order model.Order
-		err = json.Unmarshal(orderRec.Body.Bytes(), &order)
+		err = json.Unmarshal(orderAllRec.Body.Bytes(), &orders)
 		assert.NoError(s.T(), err)
 
-		fmt.Println(len(stat), len(orders), success, fail)
+		fmt.Println(len(orders), stat.Processed, stat.Failed)
 
-		return len(orders) == success-fail
-	}, 12*time.Second, 2*time.Second)
+		return len(orders) == stat.Processed-stat.Failed
+	}, 10*time.Second, 2*time.Second)
 }
 
 func (s *IntegrationTestSuite) TearDownTest() {

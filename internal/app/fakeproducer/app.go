@@ -2,42 +2,100 @@ package fakeproducer
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/labstack/echo/v4"
 	"github.com/nats-io/stan.go"
 	"go.uber.org/zap"
 
 	"github.com/msmkdenis/wb-order-nats/internal/model"
 )
 
-func Run(cluster string, clientID string, natsURL string, count int) {
+const (
+	cluster  = "test-cluster"
+	clientID = "test-sender"
+	natsURL  = "http://127.0.0.1:4222"
+	servAddr = "127.0.0.1:6000"
+)
+
+func Run() {
 	logger, _ := zap.NewProduction()
+	producer := New(cluster, clientID, natsURL, logger)
+	e := echo.New()
+	NewProducerHandler(e, producer, logger)
+
+	errStart := e.Start(servAddr)
+	if errStart != nil && !errors.Is(errStart, http.ErrServerClosed) {
+		logger.Fatal(errStart.Error())
+	}
+}
+
+type Producer struct {
+	sc     stan.Conn
+	logger *zap.Logger
+}
+
+func New(cluster string, clientID string, natsURL string, logger *zap.Logger) *Producer {
+	sc, err := stan.Connect(cluster, clientID, stan.NatsURL(natsURL))
+	if err != nil {
+		logger.Fatal("Error connecting", zap.Error(err))
+	}
+
+	return &Producer{
+		sc:     sc,
+		logger: logger,
+	}
+}
+
+type ProducerHandler struct {
+	producer *Producer
+	logger   *zap.Logger
+	e        *echo.Echo
+}
+
+func NewProducerHandler(e *echo.Echo, producer *Producer, logger *zap.Logger) *ProducerHandler {
+	handler := &ProducerHandler{
+		producer: producer,
+		logger:   logger,
+		e:        e,
+	}
+
+	e.POST("/api/v1/producer/:msgCount", handler.Send)
+
+	return handler
+}
+
+func (h *ProducerHandler) Send(c echo.Context) error {
+	msgCount := c.Param("msgCount")
+	count, err := strconv.Atoi(msgCount)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
 
 	ackHandler := func(ackedNuid string, err error) {
 		if err != nil {
-			logger.Error("Warning: error publishing msg id ", zap.String("nuid", ackedNuid), zap.Error(err))
+			h.logger.Error("Warning: error publishing msg id ", zap.String("nuid", ackedNuid), zap.Error(err))
 		} else {
-			logger.Info("Received ack for msg ", zap.String("nuid", ackedNuid))
+			h.logger.Info("Received ack for msg ", zap.String("nuid", ackedNuid))
 		}
-	}
-
-	sc, err := stan.Connect(cluster, clientID, stan.NatsURL(natsURL))
-	if err != nil {
-		logger.Error("Error connecting", zap.Error(err))
-		return
 	}
 
 	for i := 0; i < count; i++ {
 		order := newFakeOrder()
 		or, _ := json.Marshal(order)
-		_, err := sc.PublishAsync("orders", or, ackHandler) // returns immediately
+		_, err := h.producer.sc.PublishAsync("orders", or, ackHandler) // returns immediately
 		if err != nil {
-			logger.Error("Error publishing", zap.Error(err))
+			h.logger.Error("Error publishing", zap.Error(err))
+			return c.JSON(http.StatusInternalServerError, err.Error())
 		}
 	}
+
+	return c.NoContent(http.StatusOK)
 }
 
 func newFakeOrder() model.Order {

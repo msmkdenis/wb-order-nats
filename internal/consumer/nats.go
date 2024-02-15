@@ -45,7 +45,7 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 }
 
 func (n *NatsClient) OrderProcessingRun() error {
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 10; i++ {
 		go func() {
 			_, err := n.client.QueueSubscribe("orders", "test-queue", n.consumeOrder(), stan.DurableName("test-durable"),
 				stan.DeliverAllAvailable(), stan.MaxInflight(20))
@@ -74,7 +74,7 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 }
 
 func (n *NatsClient) WorkerSaveRun() {
-	for i := 0; i < 200; i++ {
+	for i := 0; i < 20; i++ {
 		go func() {
 			for order := range n.ordersChan {
 				err := n.os.Save(context.Background(), order)
@@ -90,17 +90,18 @@ func (n *NatsClient) WorkerSaveRun() {
 						n.sp.PushStats(m)
 						n.logger.Info("error", zap.Error(err))
 					}(order)
+				} else {
+					n.logger.Info("saved", zap.String("id", order.OrderUID))
+					go func(order model.Order) {
+						m := metrics.MessageStat{
+							ID:        order.OrderUID,
+							Status:    "success",
+							Message:   "ok",
+							Processed: time.Now().UTC(),
+						}
+						n.sp.PushStats(m)
+					}(order)
 				}
-				n.logger.Info("saved", zap.String("id", order.OrderUID))
-				go func(order model.Order) {
-					m := metrics.MessageStat{
-						ID:        order.OrderUID,
-						Status:    "processed",
-						Message:   "ok",
-						Processed: time.Now().UTC(),
-					}
-					n.sp.PushStats(m)
-				}(order)
 			}
 		}()
 	}

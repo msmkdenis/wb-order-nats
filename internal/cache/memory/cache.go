@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"fmt"
 	"sync"
 
 	"go.uber.org/zap"
@@ -17,6 +18,7 @@ type Cache struct {
 func NewCache(logger *zap.Logger) *Cache {
 	return &Cache{
 		mu:     sync.RWMutex{},
+		items:  make(map[string]model.Order),
 		logger: logger,
 	}
 }
@@ -34,8 +36,9 @@ func (c *Cache) GetOrder(key string) (model.Order, bool) {
 
 	value, ok := c.items[key]
 
-	c.logger.Info("Get from cache", zap.String("key", key))
-	c.logger.Info("Value", zap.Any("value", value))
+	if ok {
+		c.logger.Info("Get from cache", zap.String("key", key))
+	}
 
 	return value, ok
 }
@@ -43,11 +46,9 @@ func (c *Cache) GetOrder(key string) (model.Order, bool) {
 func (c *Cache) RestoreCache(orders []model.Order) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	fmt.Println(len(orders))
 
-	items := make(map[string]model.Order, len(orders))
 	for _, order := range orders {
-		items[order.OrderUID] = order
+		c.items[order.OrderUID] = order
 	}
-
-	c.items = items
 }
