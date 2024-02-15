@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"fmt"
 	"sync"
 
 	"go.uber.org/zap"
@@ -46,7 +45,6 @@ func (c *Cache) GetOrder(key string) (model.Order, bool) {
 func (c *Cache) RestoreCache(orders []model.Order) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	fmt.Println(len(orders))
 
 	for _, order := range orders {
 		c.items[order.OrderUID] = order

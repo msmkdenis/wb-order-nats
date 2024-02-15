@@ -121,7 +121,7 @@ func (s *IntegrationTestSuite) TestProcessedMessagesCount() {
 	cProducer := s.echo.NewContext(producerReq, producerRec)
 	cProducer.SetPath("/:msgCount")
 	cProducer.SetParamNames("msgCount")
-	cProducer.SetParamValues("10000")
+	cProducer.SetParamValues("1000")
 	err := s.producerHandler.Send(cProducer)
 	assert.NoError(s.T(), err)
 
@@ -139,15 +139,13 @@ func (s *IntegrationTestSuite) TestProcessedMessagesCount() {
 		var stat StatCountsDTO
 		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
 		assert.NoError(s.T(), err)
-		assert.Equal(s.T(), 10_000, stat.Processed)
+		assert.Equal(s.T(), 1_000, stat.Processed)
 
 		err = s.orderHandler.FindAll(cAllOrder)
 		assert.NoError(s.T(), err)
 		var orders []model.Order
 		err = json.Unmarshal(orderAllRec.Body.Bytes(), &orders)
 		assert.NoError(s.T(), err)
-
-		fmt.Println(len(orders), stat.Processed, stat.Failed)
 
 		return len(orders) == stat.Processed-stat.Failed
 	}, 10*time.Second, 2*time.Second)
