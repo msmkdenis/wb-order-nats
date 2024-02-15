@@ -9,19 +9,20 @@ on:
 
 jobs:
 
-  lint:
-    name: golangci-lint
+  golangci:
+    name: lint
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
         with:
-          version: v1.53
-          # Optional: The mode to install golangci-lint. It can be 'binary' or 'goinstall'.
-          # install-mode: "goinstall"
+          go-version: '1.21'
+          check-latest: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3.6.0
+        with:
+          version: v1.51.2
 
   wb-order-nats-tests:
     runs-on: ubuntu-latest
