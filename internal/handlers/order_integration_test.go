@@ -151,6 +151,79 @@ func (s *IntegrationTestSuite) TestProcessedMessagesCount() {
 	}, 10*time.Second, 2*time.Second)
 }
 
+func (s *IntegrationTestSuite) TestGetProcessedOrder() {
+	producerReq := httptest.NewRequest(http.MethodPost, "/api/v1/producer/", nil)
+	producerRec := httptest.NewRecorder()
+	cProducer := s.echo.NewContext(producerReq, producerRec)
+	cProducer.SetPath("/:msgCount")
+	cProducer.SetParamNames("msgCount")
+	cProducer.SetParamValues("1000")
+	err := s.producerHandler.Send(cProducer)
+	assert.NoError(s.T(), err)
+
+	orderAllReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
+	orderAllRec := httptest.NewRecorder()
+	cAllOrder := s.echo.NewContext(orderAllReq, orderAllRec)
+
+	orderReq := httptest.NewRequest(http.MethodGet, "/api/v1/order/", nil)
+	orderRec := httptest.NewRecorder()
+	cOrder := s.echo.NewContext(orderReq, orderRec)
+
+	statReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil)
+	statRec := httptest.NewRecorder()
+	cStat := s.echo.NewContext(statReq, statRec)
+
+	statCountReq := httptest.NewRequest(http.MethodGet, "/api/v1/stats/counts", nil)
+	statCountRec := httptest.NewRecorder()
+	cStatCount := s.echo.NewContext(statCountReq, statCountRec)
+
+	assert.Eventually(s.T(), func() bool {
+		err := s.statisticsHandler.GetStats(cStat)
+		assert.NoError(s.T(), err)
+		var stat map[string][]metrics.MessageStat
+		err = json.Unmarshal(statRec.Body.Bytes(), &stat)
+		assert.NoError(s.T(), err)
+		fmt.Println(stat)
+		fmt.Println(len(stat))
+		assert.Equal(s.T(), 1_000, len(stat))
+
+		var id string
+		for _, v := range stat {
+			for _, vs := range v {
+				if vs.Status == "success" {
+					id = vs.ID
+					break
+				}
+			}
+		}
+
+		err = s.statisticsHandler.GetStatsCount(cStatCount)
+		assert.NoError(s.T(), err)
+		var statCount StatCountsDTO
+		err = json.Unmarshal(statCountRec.Body.Bytes(), &statCount)
+		assert.NoError(s.T(), err)
+		assert.Equal(s.T(), 1_000, statCount.Processed)
+
+		cOrder.SetPath("/:orderID")
+		cOrder.SetParamNames("orderID")
+		cOrder.SetParamValues(id)
+		err = s.orderHandler.FindOrderByID(cOrder)
+		assert.NoError(s.T(), err)
+		var order model.Order
+		err = json.Unmarshal(orderRec.Body.Bytes(), &order)
+		assert.NoError(s.T(), err)
+		assert.Equal(s.T(), id, order.OrderUID)
+
+		err = s.orderHandler.FindAll(cAllOrder)
+		assert.NoError(s.T(), err)
+		var orders []model.Order
+		err = json.Unmarshal(orderAllRec.Body.Bytes(), &orders)
+		assert.NoError(s.T(), err)
+
+		return len(orders) == statCount.Processed-statCount.Failed
+	}, 10*time.Second, 2*time.Second)
+}
+
 func (s *IntegrationTestSuite) TearDownTest() {
 	s.postgresContainer.Terminate(context.Background())      //nolint:errcheck
 	s.natsStreamingContainer.Terminate(context.Background()) //nolint:errcheck
