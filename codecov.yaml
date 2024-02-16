@@ -1,6 +1,7 @@
 coverage:
   status:
     patch: off
+    project: off
 
 comment:                  # this is a top-level key
   layout: " diff, flags, files"
