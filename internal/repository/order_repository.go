@@ -46,29 +46,29 @@ func (r *OrderRepository) Insert(ctx context.Context, o model.Order) error {
 	d := o.Delivery
 	p := o.Payment
 
-	tx, err := r.postgresPool.DB.Begin(context.Background())
+	tx, err := r.postgresPool.DB.Begin(ctx)
 	if err != nil {
 		r.logger.Info("Error while staring transaction", zap.String("error", err.Error()))
 		return err
 	}
-	defer tx.Rollback(context.Background()) //nolint:errcheck
+	defer tx.Rollback(ctx) //nolint:errcheck
 
-	order, err := tx.Prepare(context.Background(), "insertOrder", insertOrder)
+	order, err := tx.Prepare(ctx, "insertOrder", insertOrder)
 	if err != nil {
 		return apperr.NewValueError("unable to prepare query", apperr.Caller(), err)
 	}
 
-	delivery, err := tx.Prepare(context.Background(), "insertDelivery", insertDelivery)
+	delivery, err := tx.Prepare(ctx, "insertDelivery", insertDelivery)
 	if err != nil {
 		return apperr.NewValueError("unable to prepare query", apperr.Caller(), err)
 	}
 
-	payment, err := tx.Prepare(context.Background(), "insertPayment", insertPayment)
+	payment, err := tx.Prepare(ctx, "insertPayment", insertPayment)
 	if err != nil {
 		return apperr.NewValueError("unable to prepare query", apperr.Caller(), err)
 	}
 
-	item, err := tx.Prepare(context.Background(), "insertItem", insertItem)
+	item, err := tx.Prepare(ctx, "insertItem", insertItem)
 	if err != nil {
 		return apperr.NewValueError("unable to prepare query", apperr.Caller(), err)
 	}

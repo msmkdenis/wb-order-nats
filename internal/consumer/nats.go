@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/nats-io/stan.go"
 	"go.uber.org/zap"
 
@@ -26,6 +27,7 @@ type NatsClient struct {
 	sp         StatisticsPusher
 	logger     *zap.Logger
 	ordersChan chan model.Order
+	validate   *validator.Validate
 }
 
 func NewNatsClient(cluster string, clientID string, natsURL string, service OrderService, sp StatisticsPusher, logger *zap.Logger) (*NatsClient, error) {
@@ -41,6 +43,7 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 		sp:         sp,
 		logger:     logger,
 		ordersChan: make(chan model.Order),
+		validate:   validator.New(),
 	}, nil
 }
 
@@ -76,9 +79,32 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 		var order model.Order
 		err := json.Unmarshal(msg.Data, &order)
 		if err != nil {
-			n.logger.Info("error", zap.Error(err))
+			go func() {
+				m := metrics.MessageStat{
+					ID:        "unknown",
+					Status:    "error",
+					Message:   err.Error(),
+					Processed: time.Now().UTC(),
+				}
+				n.sp.PushStats(m)
+				n.logger.Info("error", zap.Error(err))
+			}()
 		} else {
-			n.ordersChan <- order
+			err = n.validate.Struct(order)
+			if err != nil {
+				go func(order model.Order) {
+					m := metrics.MessageStat{
+						ID:        order.OrderUID,
+						Status:    "error",
+						Message:   err.Error(),
+						Processed: time.Now().UTC(),
+					}
+					n.sp.PushStats(m)
+					n.logger.Info("error", zap.Error(err))
+				}(order)
+			} else {
+				n.ordersChan <- order
+			}
 		}
 	}
 }

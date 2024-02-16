@@ -10,13 +10,11 @@ import (
 	"github.com/msmkdenis/wb-order-nats/pkg/apperr"
 )
 
-// PostgresPool represents PostgreSQL connection pool.
 type PostgresPool struct {
 	DB     *pgxpool.Pool
 	logger *zap.Logger
 }
 
-// NewPostgresPool returns a new instance of PostgresPool with pool of connections.
 func NewPostgresPool(ctx context.Context, connection string, logger *zap.Logger) (*PostgresPool, error) {
 	dbPool, err := pgxpool.New(ctx, connection)
 	if err != nil {

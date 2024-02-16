@@ -81,7 +81,7 @@ func NewProducerHandler(e *echo.Echo, producer *Producer, logger *zap.Logger) *P
 	}
 
 	e.POST("/api/v1/producer/:msgCount", handler.Send)
-
+	e.POST("/api/v1/producer/validate-fail/:msgCount", handler.SendFail)
 	return handler
 }
 
@@ -101,7 +101,7 @@ func (h *ProducerHandler) Send(c echo.Context) error {
 	}
 
 	for i := 0; i < count; i++ {
-		order := newFakeOrder()
+		order := newFakeOrder(0, 2_000)
 		or, _ := json.Marshal(order)
 		_, err := h.producer.sc.PublishAsync("orders", or, ackHandler) // returns immediately
 		if err != nil {
@@ -113,7 +113,35 @@ func (h *ProducerHandler) Send(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func newFakeOrder() model.Order {
+func (h *ProducerHandler) SendFail(c echo.Context) error {
+	msgCount := c.Param("msgCount")
+	count, err := strconv.Atoi(msgCount)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, err.Error())
+	}
+
+	ackHandler := func(ackedNuid string, err error) {
+		if err != nil {
+			h.logger.Error("Warning: error publishing msg id ", zap.String("nuid", ackedNuid), zap.Error(err))
+		} else {
+			h.logger.Info("Received ack for msg ", zap.String("nuid", ackedNuid))
+		}
+	}
+
+	for i := 0; i < count; i++ {
+		order := newFakeOrder(-2_000, -1)
+		or, _ := json.Marshal(order)
+		_, err := h.producer.sc.PublishAsync("orders", or, ackHandler) // returns immediately
+		if err != nil {
+			h.logger.Error("Error publishing", zap.Error(err))
+			return c.JSON(http.StatusInternalServerError, err.Error())
+		}
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func newFakeOrder(minPay int, maxPay int) model.Order {
 	faker := gofakeit.New(0)
 	trackNumber := faker.Word()
 
@@ -128,7 +156,7 @@ func newFakeOrder() model.Order {
 
 	delivery := newFakeDelivery()
 
-	payment := newFakePayment()
+	payment := newFakePayment(minPay, maxPay)
 	payment.GoodsTotal = totalSum
 
 	dateTime := faker.DateRange(time.Now().AddDate(0, -6, 0), time.Now())
@@ -172,19 +200,19 @@ func newFakeItem(trackNumber string) model.Item {
 	}
 }
 
-func newFakePayment() model.Payment {
+func newFakePayment(minPay int, maxPay int) model.Payment {
 	faker := gofakeit.New(0)
 	return model.Payment{
 		Transaction:  faker.Word(),
 		RequestID:    "",
 		Currency:     faker.Currency().Short,
 		Provider:     faker.Word(),
-		Amount:       faker.IntRange(1, 2000),
+		Amount:       faker.IntRange(minPay, maxPay),
 		PaymentDt:    faker.DateRange(time.Now().AddDate(0, -6, 0), time.Now()).Unix(),
 		Bank:         faker.RandomString([]string{"alpha", "sberbank", "sovcombank"}),
-		DeliveryCost: faker.IntRange(1000, 3000),
+		DeliveryCost: faker.IntRange(minPay, maxPay),
 		GoodsTotal:   0,
-		CustomFee:    faker.IntRange(1000, 3000),
+		CustomFee:    faker.IntRange(minPay, maxPay),
 	}
 }
 

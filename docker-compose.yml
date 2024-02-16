@@ -36,6 +36,8 @@ services:
       - NATS_DURABLE=test-durable
       - NATS_URL=http://nats:4222/
       - DATABASE_URI=postgres://postgres:postgres@wborder_db:5432/wb-order?sslmode=disable
+      - NATS_SUBSCRIBERS=10
+      - WORKERS=20
     ports:
       - "7000:7000"
     depends_on:

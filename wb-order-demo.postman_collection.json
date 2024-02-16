@@ -1,0 +1,172 @@
+{
+	"info": {
+		"_postman_id": "cd97607d-d169-458e-bc3a-460bb86ef3f2",
+		"name": "wb-order-demo",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "21643786"
+	},
+	"item": [
+		{
+			"name": "PostOrder",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"order_uid\": \"b563feb7b2b84b6test\",\r\n  \"track_number\": \"WBILMTESTTRACK\",\r\n  \"entry\": \"WBIL\",\r\n  \"delivery\": {\r\n    \"name\": \"Test Testov\",\r\n    \"phone\": \"+9720000000\",\r\n    \"zip\": \"2639809\",\r\n    \"city\": \"Kiryat Mozkin\",\r\n    \"address\": \"Ploshad Mira 15\",\r\n    \"region\": \"Kraiot\",\r\n    \"email\": \"test@gmail.com\"\r\n  },\r\n  \"payment\": {\r\n    \"transaction\": \"b563feb7b2b84b6test\",\r\n    \"request_id\": \"\",\r\n    \"currency\": \"USD\",\r\n    \"provider\": \"wbpay\",\r\n    \"amount\": 1817,\r\n    \"payment_dt\": 1637907727,\r\n    \"bank\": \"alpha\",\r\n    \"delivery_cost\": 1500,\r\n    \"goods_total\": 317,\r\n    \"custom_fee\": 0\r\n  },\r\n  \"items\": [\r\n    {\r\n      \"chrt_id\": 9934930,\r\n      \"track_number\": \"WBILMTESTTRACK\",\r\n      \"price\": 453,\r\n      \"rid\": \"ab4219087a764ae0btest\",\r\n      \"name\": \"Mascaras\",\r\n      \"sale\": 30,\r\n      \"size\": \"0\",\r\n      \"total_price\": 317,\r\n      \"nm_id\": 2389212,\r\n      \"brand\": \"Vivienne Sabo\",\r\n      \"status\": 202\r\n    }\r\n  ],\r\n  \"locale\": \"en\",\r\n  \"internal_signature\": \"\",\r\n  \"customer_id\": \"test\",\r\n  \"delivery_service\": \"meest\",\r\n  \"shardkey\": \"9\",\r\n  \"sm_id\": 99,\r\n  \"date_created\": \"2021-11-26T06:22:19Z\",\r\n  \"oof_shard\": \"1\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:7000/api/v1/order",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7000",
+					"path": [
+						"api",
+						"v1",
+						"order"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "SendMessages",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:6000/api/v1/producer/1000",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "6000",
+					"path": [
+						"api",
+						"v1",
+						"producer",
+						"1000"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "SendFailMessages",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:6000/api/v1/producer/validate-fail/10",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "6000",
+					"path": [
+						"api",
+						"v1",
+						"producer",
+						"validate-fail",
+						"10"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "FindOrder",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:7000/api/v1/order/b563feb7b2b84b6test",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7000",
+					"path": [
+						"api",
+						"v1",
+						"order",
+						"b563feb7b2b84b6test"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetStats",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:7000/api/v1/stats",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7000",
+					"path": [
+						"api",
+						"v1",
+						"stats"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetStatsCount",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:7000/api/v1/stats/counts",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7000",
+					"path": [
+						"api",
+						"v1",
+						"stats",
+						"counts"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "FindAllOrders",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:7000/api/v1/order/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7000",
+					"path": [
+						"api",
+						"v1",
+						"order",
+						""
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
