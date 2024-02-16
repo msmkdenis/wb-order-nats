@@ -3,7 +3,6 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/nats-io/stan.go"
@@ -30,7 +29,6 @@ type NatsClient struct {
 }
 
 func NewNatsClient(cluster string, clientID string, natsURL string, service OrderService, sp StatisticsPusher, logger *zap.Logger) (*NatsClient, error) {
-	fmt.Println(cluster, clientID, natsURL)
 	client, err := stan.Connect(cluster, clientID, stan.NatsURL(natsURL))
 	if err != nil {
 		logger.Info("error", zap.Error(err))
@@ -46,10 +44,11 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 	}, nil
 }
 
-func (n *NatsClient) OrderProcessingRun(subject string, qGroup string, durable string) error {
-	for i := 0; i < 10; i++ {
+func (n *NatsClient) OrderProcessingRun(subject string, qGroup string, durable string, subscribers int, workers int, unsubscribe chan struct{}) error {
+	for i := 0; i < subscribers; i++ {
 		go func() {
-			_, err := n.client.QueueSubscribe(subject, qGroup, n.consumeOrder(), stan.DurableName(durable),
+			n.logger.Info("subscribing", zap.String("subject", subject), zap.String("qGroup", qGroup), zap.String("durable", durable))
+			sc, err := n.client.QueueSubscribe(subject, qGroup, n.consumeOrder(), stan.DurableName(durable),
 				stan.DeliverAllAvailable(), stan.MaxInflight(20))
 			if err != nil {
 				n.logger.Info("error", zap.Error(err))
@@ -57,9 +56,18 @@ func (n *NatsClient) OrderProcessingRun(subject string, qGroup string, durable s
 					n.logger.Info("error", zap.Error(err))
 				}
 			}
+
+			go func() {
+				<-unsubscribe
+				n.logger.Info("unsubscribing...")
+				err = sc.Unsubscribe()
+				if err != nil {
+					n.logger.Info("error", zap.Error(err))
+				}
+			}()
 		}()
 	}
-	go n.WorkerSaveRun()
+	go n.WorkerSaveRun(workers)
 	return nil
 }
 
@@ -75,8 +83,8 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 	}
 }
 
-func (n *NatsClient) WorkerSaveRun() {
-	for i := 0; i < 20; i++ {
+func (n *NatsClient) WorkerSaveRun(workers int) {
+	for i := 0; i < workers; i++ {
 		go func() {
 			for order := range n.ordersChan {
 				err := n.os.Save(context.Background(), order)

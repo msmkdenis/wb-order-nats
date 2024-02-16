@@ -2,20 +2,23 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/gommon/log"
 )
 
 type Config struct {
-	Address     string
-	DatabaseURI string
-	NatsCluster string
-	NatsClient  string
-	NatsURL     string
-	NatsSubject string
-	NatsQGroup  string
-	NatsDurable string
+	Address         string
+	DatabaseURI     string
+	NatsCluster     string
+	NatsClient      string
+	NatsURL         string
+	NatsSubject     string
+	NatsQGroup      string
+	NatsDurable     string
+	NatsSubscribers int
+	Workers         int
 }
 
 func NewConfig() *Config {
@@ -33,6 +36,14 @@ func NewConfig() *Config {
 	config.NatsSubject = os.Getenv("NATS_SUBJECT")
 	config.NatsQGroup = os.Getenv("NATS_QGROUP")
 	config.NatsDurable = os.Getenv("NATS_DURABLE")
+
+	if config.NatsSubscribers, err = strconv.Atoi(os.Getenv("NATS_SUBSCRIBERS")); err != nil {
+		config.NatsSubscribers = 5
+	}
+
+	if config.Workers, err = strconv.Atoi(os.Getenv("WORKERS")); err != nil {
+		config.Workers = 10
+	}
 
 	return config
 }

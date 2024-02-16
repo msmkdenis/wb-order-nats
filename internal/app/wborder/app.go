@@ -48,8 +48,9 @@ func Run(quitSignal chan os.Signal) {
 		logger.Error("failed to connect to nats-streaming", zap.Error(err))
 	}
 
+	unsubscribe := make(chan struct{})
 	if nats != nil {
-		err = nats.OrderProcessingRun(cfg.NatsSubject, cfg.NatsQGroup, cfg.NatsDurable)
+		err = nats.OrderProcessingRun(cfg.NatsSubject, cfg.NatsQGroup, cfg.NatsDurable, cfg.NatsSubscribers, cfg.Workers, unsubscribe)
 		if err != nil {
 			logger.Error("failed to run order processing", zap.Error(err))
 		}
@@ -69,6 +70,7 @@ func Run(quitSignal chan os.Signal) {
 
 	go func() {
 		<-quitSignal
+		close(unsubscribe)
 
 		shutdownCtx, cancel := context.WithTimeout(serverCtx, 30*time.Second)
 		defer cancel()
@@ -80,6 +82,7 @@ func Run(quitSignal chan os.Signal) {
 			}
 		}()
 
+		logger.Info("Shutting down gracefully...")
 		if errShutdown := e.Shutdown(shutdownCtx); errShutdown != nil {
 			e.Logger.Fatal(errShutdown)
 		}

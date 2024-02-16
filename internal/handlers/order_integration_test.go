@@ -97,8 +97,9 @@ func (s *IntegrationTestSuite) SetupTest() {
 		logger.Error("failed to connect to nats-streaming", zap.Error(err))
 	}
 
+	unsubscribe := make(chan struct{})
 	if s.natsClient != nil {
-		err = s.natsClient.OrderProcessingRun("orders", "test-queue", "test-durable")
+		err = s.natsClient.OrderProcessingRun("orders", "test-queue", "test-durable", 10, 20, unsubscribe)
 		if err != nil {
 			logger.Error("failed to run order processing", zap.Error(err))
 		}
