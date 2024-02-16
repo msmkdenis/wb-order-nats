@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 
@@ -21,6 +22,7 @@ type OrderHandler struct {
 	orderService OrderService
 	cache        *middleware.CacheMiddleware
 	logger       *zap.Logger
+	validator    *validator.Validate
 }
 
 func NewOrderHandler(e *echo.Echo, service OrderService, cache *middleware.CacheMiddleware, logger *zap.Logger) *OrderHandler {
@@ -28,6 +30,7 @@ func NewOrderHandler(e *echo.Echo, service OrderService, cache *middleware.Cache
 		orderService: service,
 		cache:        cache,
 		logger:       logger,
+		validator:    validator.New(),
 	}
 
 	e.POST("/api/v1/order", handler.SaveOrder)
@@ -49,7 +52,13 @@ func (h *OrderHandler) SaveOrder(c echo.Context) error {
 	err := c.Bind(&order)
 	if err != nil {
 		h.logger.Info("Error while binding request", zap.Error(err))
-		return c.JSON(http.StatusInternalServerError, map[string]string{"Error while binding request": err.Error()})
+		return c.JSON(http.StatusBadRequest, map[string]string{"Error while binding request": err.Error()})
+	}
+
+	err = h.validator.Struct(order)
+	if err != nil {
+		h.logger.Info("Error while validating request", zap.Error(err))
+		return c.JSON(http.StatusBadRequest, map[string]string{"Error while validating request": err.Error()})
 	}
 
 	err = h.orderService.Save(context.TODO(), order)

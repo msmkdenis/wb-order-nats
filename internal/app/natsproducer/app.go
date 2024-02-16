@@ -157,7 +157,7 @@ func newFakeOrder(minPay int, maxPay int) model.Order {
 	delivery := newFakeDelivery()
 
 	payment := newFakePayment(minPay, maxPay)
-	payment.GoodsTotal = totalSum
+	payment.GoodsTotal = &totalSum
 
 	dateTime := faker.DateRange(time.Now().AddDate(0, -6, 0), time.Now())
 	date := dateTime.Format("2006-01-02T15:04:05Z")
@@ -202,17 +202,21 @@ func newFakeItem(trackNumber string) model.Item {
 
 func newFakePayment(minPay int, maxPay int) model.Payment {
 	faker := gofakeit.New(0)
+	a := faker.IntRange(minPay, maxPay)
+	d := faker.IntRange(minPay, maxPay)
+	g := faker.IntRange(minPay, maxPay)
+	c := faker.IntRange(minPay, maxPay)
 	return model.Payment{
 		Transaction:  faker.Word(),
 		RequestID:    "",
 		Currency:     faker.Currency().Short,
 		Provider:     faker.Word(),
-		Amount:       faker.IntRange(minPay, maxPay),
+		Amount:       &a,
 		PaymentDt:    faker.DateRange(time.Now().AddDate(0, -6, 0), time.Now()).Unix(),
 		Bank:         faker.RandomString([]string{"alpha", "sberbank", "sovcombank"}),
-		DeliveryCost: faker.IntRange(minPay, maxPay),
-		GoodsTotal:   0,
-		CustomFee:    faker.IntRange(minPay, maxPay),
+		DeliveryCost: &d,
+		GoodsTotal:   &g,
+		CustomFee:    &c,
 	}
 }
 

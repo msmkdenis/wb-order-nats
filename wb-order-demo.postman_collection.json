@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "cd97607d-d169-458e-bc3a-460bb86ef3f2",
+		"_postman_id": "9f4ec53f-0e32-4d9d-9fee-1334e1a71e04",
 		"name": "wb-order-demo",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "21643786"
@@ -42,7 +42,7 @@
 				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:6000/api/v1/producer/1000",
+					"raw": "http://localhost:6000/api/v1/producer/10",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -52,7 +52,7 @@
 						"api",
 						"v1",
 						"producer",
-						"1000"
+						"10"
 					]
 				}
 			},
@@ -87,7 +87,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:7000/api/v1/order/b563feb7b2b84b6test",
+					"raw": "http://localhost:7000/api/v1/order/0c8811c8-35a0-44cf-a6c3-f37030b1dd81",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -97,7 +97,7 @@
 						"api",
 						"v1",
 						"order",
-						"b563feb7b2b84b6test"
+						"0c8811c8-35a0-44cf-a6c3-f37030b1dd81"
 					]
 				}
 			},
