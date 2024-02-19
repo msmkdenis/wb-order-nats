@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -43,9 +44,11 @@ func Run(quitSignal chan os.Signal) {
 	statService := metrics.NewMessageStatsUseCase(logger)
 	go statService.ProcessedMessagesRun(context.Background())
 
-	nats, err := consumer.NewNatsClient(cfg.NatsCluster, cfg.NatsClient, cfg.NatsURL, orderService, statService, logger)
+	wg := &sync.WaitGroup{}
+	wg.Add(cfg.Workers)
+	nats, err := consumer.NewNatsClient(cfg.NatsCluster, cfg.NatsClient, cfg.NatsURL, wg, orderService, statService, logger)
 	if err != nil {
-		logger.Error("failed to connect to nats-streaming", zap.Error(err))
+		logger.Fatal("failed to connect to nats-streaming", zap.Error(err))
 	}
 
 	unsubscribe := make(chan struct{})
@@ -95,7 +98,7 @@ func Run(quitSignal chan os.Signal) {
 			log.Fatal(errStart)
 		}
 	}()
-
+	wg.Wait()
 	<-serverCtx.Done()
 }
 

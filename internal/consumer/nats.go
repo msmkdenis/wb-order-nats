@@ -3,6 +3,8 @@ package consumer
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -28,9 +30,10 @@ type NatsClient struct {
 	logger     *zap.Logger
 	ordersChan chan model.Order
 	validate   *validator.Validate
+	wg         *sync.WaitGroup
 }
 
-func NewNatsClient(cluster string, clientID string, natsURL string, service OrderService, sp StatisticsPusher, logger *zap.Logger) (*NatsClient, error) {
+func NewNatsClient(cluster string, clientID string, natsURL string, wg *sync.WaitGroup, service OrderService, sp StatisticsPusher, logger *zap.Logger) (*NatsClient, error) {
 	client, err := stan.Connect(cluster, clientID, stan.NatsURL(natsURL))
 	if err != nil {
 		logger.Info("error", zap.Error(err))
@@ -44,10 +47,12 @@ func NewNatsClient(cluster string, clientID string, natsURL string, service Orde
 		logger:     logger,
 		ordersChan: make(chan model.Order),
 		validate:   validator.New(),
+		wg:         wg,
 	}, nil
 }
 
 func (n *NatsClient) OrderProcessingRun(subject string, qGroup string, durable string, subscribers int, workers int, unsubscribe chan struct{}) error {
+	counter := atomic.Int64{}
 	for i := 0; i < subscribers; i++ {
 		go func() {
 			n.logger.Info("subscribing", zap.String("subject", subject), zap.String("qGroup", qGroup), zap.String("durable", durable))
@@ -67,9 +72,19 @@ func (n *NatsClient) OrderProcessingRun(subject string, qGroup string, durable s
 				if err != nil {
 					n.logger.Info("error", zap.Error(err))
 				}
+				counter.Add(1)
 			}()
 		}()
 	}
+	go func() {
+		for {
+			if counter.Load() == int64(subscribers) {
+				n.logger.Info("all subscribers unsubscribed")
+				close(n.ordersChan)
+				break
+			}
+		}
+	}()
 	go n.WorkerSaveRun(workers)
 	return nil
 }
@@ -111,7 +126,7 @@ func (n *NatsClient) consumeOrder() stan.MsgHandler {
 
 func (n *NatsClient) WorkerSaveRun(workers int) {
 	for i := 0; i < workers; i++ {
-		go func() {
+		go func(i int) {
 			for order := range n.ordersChan {
 				err := n.os.Save(context.Background(), order)
 				if err != nil {
@@ -139,6 +154,8 @@ func (n *NatsClient) WorkerSaveRun(workers int) {
 					}(order)
 				}
 			}
-		}()
+			n.logger.Info("worker stopped", zap.Int("id", i))
+			n.wg.Done()
+		}(i)
 	}
 }

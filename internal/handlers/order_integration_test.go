@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -91,8 +92,10 @@ func (s *IntegrationTestSuite) SetupTest() {
 	statService := metrics.NewMessageStatsUseCase(logger)
 	go statService.ProcessedMessagesRun(context.Background())
 
+	wg := &sync.WaitGroup{}
+	wg.Add(20)
 	s.natsClient, err = consumer.NewNatsClient("test-cluster", "test-consumer",
-		fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), s.orderService, statService, logger)
+		fmt.Sprintf("http://%s:%d", s.natsHost, s.natsPort.Int()), wg, s.orderService, statService, logger)
 	if err != nil {
 		logger.Error("failed to connect to nats-streaming", zap.Error(err))
 	}
